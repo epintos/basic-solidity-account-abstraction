@@ -13,15 +13,23 @@ import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoi
 contract MinimalAccount is IAccount, Ownable {
     /// ERRORS
     error MinimalAccount__NotFromEntryPoint();
+    error MinimalAccount__NotFromEntryPointOrOwner();
+    error MinimalAccount__CallFailed(bytes result);
 
     /// STATE VARIABLES
-
     IEntryPoint private immutable i_entryPoint;
 
     /// MODIFIERS
     modifier requireFromEntryPoint() {
         if (msg.sender != address(i_entryPoint)) {
             revert MinimalAccount__NotFromEntryPoint();
+        }
+        _;
+    }
+
+    modifier requireFromEntryPointOrOwner() {
+        if (msg.sender != address(i_entryPoint) && msg.sender != owner()) {
+            revert MinimalAccount__NotFromEntryPointOrOwner();
         }
         _;
     }
@@ -33,6 +41,23 @@ contract MinimalAccount is IAccount, Ownable {
     }
 
     // EXTERNAL FUNCTIONS
+
+    // We need to be able to receive ether to pay for transactions
+    receive() external payable { }
+
+    /**
+     * @notice Executes a call to a destination address with a value and function data
+     * @notice Only the entry point or the owner can call this function
+     * @param dest The destination address
+     * @param value The value to send
+     * @param functionData The function data to call
+     */
+    function execute(address dest, uint256 value, bytes calldata functionData) external requireFromEntryPointOrOwner {
+        (bool success, bytes memory result) = dest.call{ value: value }(functionData);
+        if (!success) {
+            revert MinimalAccount__CallFailed(result);
+        }
+    }
 
     /**
      * @notice Function called by the entry point to validate the user operation
