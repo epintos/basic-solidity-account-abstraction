@@ -16,5 +16,6 @@ install :
 deploy-sepolia :
 	@forge script script/DeployMinimalAccount.s.sol:DeployMinimalAccount --rpc-url $(SEPOLIA_RPC_URL) --account $(SEPOLIA_ACCOUNT) --broadcast --verify --etherscan-api-key $(ETHERSCAN_API_KEY) -vvvv
 
+# Private key is for testing purposes only and matches the key in HelperConfig
 deploy-anvil :
-	@forge script script/DeployMinimalAccount.s.sol:DeployMinimalAccount --rpc-url $(RPC_URL) --account $(ANVIL_ACCOUNT) --broadcast -vvvv --sender $(ANVIL_ACCOUNT_ADDRESS)
+	@forge script script/DeployMinimalAccount.s.sol:DeployMinimalAccount --rpc-url $(RPC_URL) --broadcast -vvvv --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80

@@ -7,7 +7,9 @@ import { MinimalAccount } from "src/ethereum/MinimalAccount.sol";
 import { HelperConfig } from "script/HelperConfig.s.sol";
 
 contract DeployMinimalAccount is Script {
-    function run() external { }
+    function run() external {
+        deployMinimalAccount();
+    }
 
     function deployMinimalAccount() public returns (HelperConfig helperConfig, MinimalAccount minimalAccount) {
         helperConfig = new HelperConfig();
