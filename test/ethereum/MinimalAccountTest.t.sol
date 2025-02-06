@@ -25,7 +25,7 @@ contract MinimalAccountTest is Test {
         DeployMinimalAccount deployMinimalAccount = new DeployMinimalAccount();
         (helperConfig, minimalAccount) = deployMinimalAccount.deployMinimalAccount();
         networkConfig = helperConfig.getConfig();
-        usdc = new ERC20Mock();
+        usdc = ERC20Mock(networkConfig.usdc);
         sendPackedUserOp = new SendPackedUserOp();
     }
     // HelperFunctions

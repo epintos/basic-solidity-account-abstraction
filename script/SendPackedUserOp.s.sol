@@ -7,11 +7,32 @@ import { PackedUserOperation } from "@account-abstraction/contracts/interfaces/P
 import { HelperConfig, CodeConstants } from "script/HelperConfig.s.sol";
 import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { DevOpsTools } from "lib/foundry-devops/src/DevOpsTools.sol";
+import { MinimalAccount } from "src/ethereum/MinimalAccount.sol";
 
 contract SendPackedUserOp is Script, CodeConstants {
     using MessageHashUtils for bytes32;
 
-    function run() external { }
+    function run() external {
+        HelperConfig helperConfig = new HelperConfig();
+        address dest = helperConfig.getConfig().usdc;
+        uint256 value = 0;
+        bytes memory functionData = abi.encodeWithSelector(IERC20.approve.selector, msg.sender, 1e18);
+        bytes memory executeCallData =
+            abi.encodeWithSelector(MinimalAccount.execute.selector, dest, value, functionData);
+
+        address minimalAccountAddress = DevOpsTools.get_most_recent_deployment("MinimalAccount", block.chainid);
+        PackedUserOperation memory userOp =
+            generateSignedUserOperation(executeCallData, helperConfig.getConfig(), minimalAccountAddress);
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = userOp;
+
+        vm.startBroadcast();
+        IEntryPoint(helperConfig.getConfig().entryPoint).handleOps(ops, payable(helperConfig.getConfig().account));
+        vm.stopBroadcast();
+    }
 
     function generateSignedUserOperation(
         bytes memory callData,
@@ -53,8 +74,8 @@ contract SendPackedUserOp is Script, CodeConstants {
     {
         uint128 verificationGasLimit = 16_777_216;
         uint128 callGasLimit = verificationGasLimit;
-        uint128 maxPriorityFreePerGas = 256;
-        uint128 maxFeePerGas = maxPriorityFreePerGas;
+        uint128 maxPriorityFeePerGas = 256;
+        uint128 maxFeePerGas = maxPriorityFeePerGas;
 
         return PackedUserOperation({
             sender: sender,
@@ -63,7 +84,7 @@ contract SendPackedUserOp is Script, CodeConstants {
             callData: callData,
             accountGasLimits: bytes32(uint256(verificationGasLimit) << 128 | callGasLimit),
             preVerificationGas: verificationGasLimit,
-            gasFees: bytes32(uint256(maxPriorityFreePerGas) << 128 | maxFeePerGas),
+            gasFees: bytes32(uint256(maxPriorityFeePerGas) << 128 | maxFeePerGas),
             paymasterAndData: hex"",
             signature: hex""
         });
