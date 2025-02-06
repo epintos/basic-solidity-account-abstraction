@@ -10,6 +10,11 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { SIG_VALIDATION_FAILED, SIG_VALIDATION_SUCCESS } from "@account-abstraction/contracts/core/Helpers.sol";
 import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
+/**
+ * @title MinimalAccount
+ * @author Esteban Pintos
+ * @notice Basic account abstraction contract that can execute calls from an entry point.
+ */
 contract MinimalAccount is IAccount, Ownable {
     /// ERRORS
     error MinimalAccount__NotFromEntryPoint();
