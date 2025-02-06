@@ -5,6 +5,7 @@ libs = ["lib"]
 remappings = [
   '@openzeppelin=lib/openzeppelin-contracts',
   '@account-abstraction/contracts/=lib/account-abstraction/contracts',
+  '@foundry-era-contracts/=lib/foundry-era-contracts',
 ]
 fs_permissions = [{ access = "read", path = "./broadcast" }]
 
