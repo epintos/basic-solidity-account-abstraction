@@ -4,11 +4,11 @@ pragma solidity ^0.8.28;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { PackedUserOperation } from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import { HelperConfig } from "script/HelperConfig.s.sol";
+import { HelperConfig, CodeConstants } from "script/HelperConfig.s.sol";
 import { IEntryPoint } from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-contract SendPackedUserOp is Script {
+contract SendPackedUserOp is Script, CodeConstants {
     using MessageHashUtils for bytes32;
 
     function run() external { }
@@ -27,7 +27,16 @@ contract SendPackedUserOp is Script {
         bytes32 userOpHash = IEntryPoint(config.entryPoint).getUserOpHash(userOp);
         bytes32 digest = userOpHash.toEthSignedMessageHash();
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(config.account, digest);
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        if (block.chainid == LOCAL_CHAIN_ID) {
+            (v, r, s) = vm.sign(ANVIL_DEFAULT_KEY, digest);
+        } else {
+            (v, r, s) = vm.sign(config.account, digest);
+        }
+
         userOp.signature = abi.encodePacked(r, s, v); // Order is important
         return userOp;
     }
