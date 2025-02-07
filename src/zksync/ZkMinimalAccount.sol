@@ -38,6 +38,7 @@ contract ZkMinimalAccount is IAccount, Ownable {
     error ZkMinimalAccount__NotFromBootLoader();
     error ZkMinimalAccount__ExecutionFailed();
     error ZkMinimalAccount__NotFromBootLoaderOrOwner();
+    error ZkMinimalAccount__FailedToPay();
 
     /// MODIFIERS
     modifier requireFromBootLoader() {
@@ -138,15 +139,28 @@ contract ZkMinimalAccount is IAccount, Ownable {
 
     function executeTransactionFromOutside(Transaction memory _transaction) external payable { }
 
+    /**
+     * @notice Pays for a transaction
+     * @dev This gets called before the execution
+     * @param _transaction The transaction to pay for
+     */
     function payForTransaction(
-        bytes32 _txHash,
-        bytes32 _suggestedSignedHash,
+        bytes32, /*_txHash*/
+        bytes32, /*_suggestedSignedHash*/
         Transaction memory _transaction
     )
         external
         payable
-    { }
+    {
+        bool success = _transaction.payToTheBootloader();
+        if (!success) {
+            revert ZkMinimalAccount__FailedToPay();
+        }
+    }
 
+    /**
+     * @notice Not supporting a paymaster
+     */
     function prepareForPaymaster(
         bytes32 _txHash,
         bytes32 _possibleSignedHash,
