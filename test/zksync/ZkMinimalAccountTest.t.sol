@@ -71,8 +71,7 @@ contract ZkMinimalAccountTest is Test {
 
     function _signTransaction(Transaction memory transaction) internal view returns (Transaction memory) {
         bytes32 unsignedTransactionHash = MemoryTransactionHelper.encodeHash(transaction);
-        bytes32 digest = unsignedTransactionHash.toEthSignedMessageHash();
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivKey, digest);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivKey, unsignedTransactionHash);
         Transaction memory signedTransaction = transaction;
         signedTransaction.signature = abi.encodePacked(r, s, v);
         return signedTransaction;
