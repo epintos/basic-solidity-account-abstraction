@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.28;
 
+// ZkSync Era imports
 import {
     IAccount,
     ACCOUNT_VALIDATION_SUCCESS_MAGIC
@@ -14,9 +15,13 @@ import { SystemContractsCaller } from
     "@foundry-era-contracts/src/system-contracts/contracts/libraries/SystemContractsCaller.sol";
 import {
     NONCE_HOLDER_SYSTEM_CONTRACT,
-    BOOTLOADER_FORMAL_ADDRESS
+    BOOTLOADER_FORMAL_ADDRESS,
+    DEPLOYER_SYSTEM_CONTRACT
 } from "@foundry-era-contracts/src/system-contracts/contracts/Constants.sol";
 import { INonceHolder } from "@foundry-era-contracts/src/system-contracts/contracts/interfaces/INonceHolder.sol";
+import { Utils } from "@foundry-era-contracts/src/system-contracts/contracts/libraries/Utils.sol";
+
+// OpenZeppelin imports
 import { MessageHashUtils } from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
@@ -31,11 +36,20 @@ contract ZkMinimalAccount is IAccount, Ownable {
     /// ERRORS
     error ZkMinimalAccount__NotEnoughBalance();
     error ZkMinimalAccount__NotFromBootLoader();
+    error ZkMinimalAccount__ExecutionFailed();
+    error ZkMinimalAccount__NotFromBootLoaderOrOwner();
 
     /// MODIFIERS
     modifier requireFromBootLoader() {
         if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
             revert ZkMinimalAccount__NotFromBootLoader();
+        }
+        _;
+    }
+
+    modifier requireFromBootLoaderOrOWner() {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != owner()) {
+            revert ZkMinimalAccount__NotFromBootLoaderOrOwner();
         }
         _;
     }
@@ -88,14 +102,40 @@ contract ZkMinimalAccount is IAccount, Ownable {
         }
     }
 
+    /**
+     * @notice Executes a transaction
+     * @notice Executes a system call if the transaction is a contract deployment
+     * @param _transaction The transaction to execute
+     */
     function executeTransaction(
-        bytes32 _txHash,
-        bytes32 _suggestedSignedHash,
+        bytes32, /*_txHash*/
+        bytes32, /*_suggestedSignedHash*/
         Transaction memory _transaction
     )
         external
         payable
-    { }
+        requireFromBootLoaderOrOWner
+    {
+        address to = address(uint160(_transaction.to));
+        uint128 value = Utils.safeCastToU128(_transaction.value);
+        bytes memory data = _transaction.data;
+
+        // At least we handle contract deployments, but we could be missing other common system calls
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
+            uint32 gas = Utils.safeCastToU32(gasleft());
+            SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value, data);
+        } else {
+            bool success;
+            assembly {
+                success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+            }
+
+            if (!success) {
+                revert ZkMinimalAccount__ExecutionFailed();
+            }
+        }
+    }
+
     function executeTransactionFromOutside(Transaction memory _transaction) external payable { }
 
     function payForTransaction(
