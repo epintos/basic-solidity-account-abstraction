@@ -60,6 +60,8 @@ contract ZkMinimalAccount is IAccount, Ownable {
     // CONSTRUCTOR
     constructor() Ownable(msg.sender) { }
 
+    receive() external payable { }
+
     // EXTERNAL FUNCTIONS
 
     /**
@@ -79,28 +81,7 @@ contract ZkMinimalAccount is IAccount, Ownable {
         requireFromBootLoader
         returns (bytes4 magic)
     {
-        // Increases nonce by calling the NonceHolder system contract
-        SystemContractsCaller.systemCallWithPropagatedRevert(
-            uint32(gasleft()),
-            address(NONCE_HOLDER_SYSTEM_CONTRACT),
-            0,
-            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
-        );
-
-        uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-        if (totalRequiredBalance > address(this).balance) {
-            revert ZkMinimalAccount__NotEnoughBalance();
-        }
-
-        bytes32 txHash = _transaction.encodeHash();
-        bytes32 convertedHash = MessageHashUtils.toEthSignedMessageHash(txHash);
-        address signer = ECDSA.recover(convertedHash, _transaction.signature);
-        bool isValidSigner = signer == owner();
-        if (isValidSigner) {
-            magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
-        } else {
-            magic = bytes4(0);
-        }
+        return _validateTransaction(_transaction);
     }
 
     /**
@@ -117,27 +98,17 @@ contract ZkMinimalAccount is IAccount, Ownable {
         payable
         requireFromBootLoaderOrOWner
     {
-        address to = address(uint160(_transaction.to));
-        uint128 value = Utils.safeCastToU128(_transaction.value);
-        bytes memory data = _transaction.data;
-
-        // At least we handle contract deployments, but we could be missing other common system calls
-        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
-            uint32 gas = Utils.safeCastToU32(gasleft());
-            SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value, data);
-        } else {
-            bool success;
-            assembly {
-                success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
-            }
-
-            if (!success) {
-                revert ZkMinimalAccount__ExecutionFailed();
-            }
-        }
+        _executeTransaction(_transaction);
     }
 
-    function executeTransactionFromOutside(Transaction memory _transaction) external payable { }
+    /**
+     * @notice Executes a normal transaction without account abstraction
+     * @param _transaction The transaction to execute
+     */
+    function executeTransactionFromOutside(Transaction memory _transaction) external payable {
+        _validateTransaction(_transaction);
+        _executeTransaction(_transaction);
+    }
 
     /**
      * @notice Pays for a transaction
@@ -171,4 +142,58 @@ contract ZkMinimalAccount is IAccount, Ownable {
     { }
 
     // INTERNAL FUNCTIONS
+
+    /**
+     * @notice Validates a transaction
+     * @param _transaction The transaction to validate
+     */
+    function _validateTransaction(Transaction memory _transaction) internal returns (bytes4 magic) {
+        // Increases nonce by calling the NonceHolder system contract
+        SystemContractsCaller.systemCallWithPropagatedRevert(
+            uint32(gasleft()),
+            address(NONCE_HOLDER_SYSTEM_CONTRACT),
+            0,
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+        );
+
+        uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
+        if (totalRequiredBalance > address(this).balance) {
+            revert ZkMinimalAccount__NotEnoughBalance();
+        }
+
+        bytes32 txHash = _transaction.encodeHash();
+        bytes32 convertedHash = MessageHashUtils.toEthSignedMessageHash(txHash);
+        address signer = ECDSA.recover(convertedHash, _transaction.signature);
+        bool isValidSigner = signer == owner();
+        if (isValidSigner) {
+            magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        } else {
+            magic = bytes4(0);
+        }
+    }
+
+    /**
+     * @notice Executes a transaction
+     * @param _transaction The transaction to execute
+     */
+    function _executeTransaction(Transaction memory _transaction) internal {
+        address to = address(uint160(_transaction.to));
+        uint128 value = Utils.safeCastToU128(_transaction.value);
+        bytes memory data = _transaction.data;
+
+        // At least we handle contract deployments, but we could be missing other common system calls
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
+            uint32 gas = Utils.safeCastToU32(gasleft());
+            SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value, data);
+        } else {
+            bool success;
+            assembly {
+                success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+            }
+
+            if (!success) {
+                revert ZkMinimalAccount__ExecutionFailed();
+            }
+        }
+    }
 }
