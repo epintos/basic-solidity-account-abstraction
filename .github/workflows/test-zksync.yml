@@ -7,30 +7,29 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
+  FOUNDRY_DISABLE_NIGHTLY_WARNING: true
 
 jobs:
   check:
     strategy:
       fail-fast: true
 
-    name: Foundry project
+    name: Foundry project Zksync
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install Foundry Zksync
-        uses: bgd-labs/foundry-zksync-toolchain@v1
-        with:
-          version: nightly
+      - name: Install Foundry-ZKsync
+        uses: dutterbutter/foundry-zksync-toolchain@v1
 
       - name: Run Forge build
         run: |
-          forge build --zksync
+          forge build src/zksync --zksync
         id: build
 
       - name: Run Forge tests
         run: |
-          forge test --mc ZkMinimalAccountTest --via-ir --zksync --system-mode=true
+          forge test test/zksync/ZkMinimalAccountTest.t.sol --zksync --system-mode=true
         id: test
